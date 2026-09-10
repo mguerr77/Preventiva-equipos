@@ -1,0 +1,115 @@
+﻿<#
+.SYNOPSIS
+    Consolidacion de los pasos 1, 2 y 3.
+.DESCRIPTION
+    1) Genera el reporte de actualizaciones si no existe.
+    2) Comprueba e instala PSWindowsUpdate si hace falta.
+    3) Lee los KB del reporte anterior y los instala.
+#>
+
+param(
+    [string]$ReportePath
+)
+
+function Get-UsbPreventivaRoot {
+    $usb = Get-Volume | Where-Object { $_.FileSystemLabel -eq 'KINGSTON' }
+    if (-not $usb) {
+        Write-Host "No se ha encontrado el pendrive KINGSTON. Se usara la ruta local del equipo." -ForegroundColor Yellow
+        return $null
+    }
+
+    $rutaBase = "$($usb.DriveLetter):\preventiva"
+    if (-not (Test-Path $rutaBase)) {
+        New-Item -ItemType Directory -Path $rutaBase -Force | Out-Null
+    }
+
+    return $rutaBase
+}
+
+function Invoke-GenerarReporteActualizaciones {
+    $root = Get-UsbPreventivaRoot
+    $nombrePC = $env:COMPUTERNAME
+    $reporteEsperado = "$root\Reporte_Sistema_y_Actualizaciones-v0.2-$nombrePC.txt"
+
+    if (-not $root) {
+        Write-Host "No hay USB KINGSTON disponible; no se puede localizar el reporte previo." -ForegroundColor Red
+        return $null
+    }
+
+    if (-not (Test-Path $reporteEsperado)) {
+        Write-Host "No existe el reporte previo. Generandolo ahora..." -ForegroundColor Cyan
+        & "$PSScriptRoot\ReporteActualizaciones.ps1"
+    }
+
+    if (Test-Path $reporteEsperado) {
+        return $reporteEsperado
+    }
+
+    return $null
+}
+
+function Get-ListaKBDesdeReporte {
+    param([string]$RutaReporte)
+
+    if (-not $RutaReporte -or -not (Test-Path $RutaReporte -PathType Leaf)) {
+        return @()
+    }
+
+    $contenido = Get-Content -Path $RutaReporte -Raw
+    $kbMatches = [regex]::Matches($contenido, 'KB\d{6,8}')
+    $lista = @()
+
+    foreach ($match in $kbMatches) {
+        $kb = $match.Value.ToUpper()
+        if ($kb -notin $lista) {
+            $lista += $kb
+        }
+    }
+
+    return $lista
+}
+
+function Ensure-PSWindowsUpdateInstalled {
+    if (-not (Get-Module -ListAvailable -Name PSWindowsUpdate)) {
+        Write-Host "El modulo PSWindowsUpdate no estÃ¡ instalado. Instalandolo..." -ForegroundColor Yellow
+        Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Confirm:$false
+        Install-Module -Name PSWindowsUpdate -Force -Confirm:$false
+    }
+}
+
+Write-Host "==================================================" -ForegroundColor Cyan
+Write-Host "  REPORTE + INSTALACION DE KB (PASOS 1-3)" -ForegroundColor Cyan
+Write-Host "==================================================" -ForegroundColor Cyan
+
+if (-not [string]::IsNullOrWhiteSpace($ReportePath)) {
+    $rutaReporte = $ReportePath
+} else {
+    $rutaReporte = Invoke-GenerarReporteActualizaciones
+}
+
+if (-not $rutaReporte) {
+    Write-Host "Introduce la ruta del reporte de actualizaciones manualmente:" -ForegroundColor Yellow
+    $rutaReporte = Read-Host "Ruta completa del archivo .txt"
+}
+
+if (-not (Test-Path $rutaReporte -PathType Leaf)) {
+    throw "No se encontro el archivo del reporte: $rutaReporte"
+}
+
+Write-Host "Reporte leido: $rutaReporte" -ForegroundColor Green
+
+$ListaKBs = Get-ListaKBDesdeReporte -RutaReporte $rutaReporte
+
+if ($ListaKBs.Count -eq 0) {
+    Write-Host "No se detectaron KB en el reporte. No hay nada que instalar." -ForegroundColor Yellow
+    exit 0
+}
+
+Write-Host "KB detectados en el informe: $($ListaKBs -join ', ')" -ForegroundColor Cyan
+
+Ensure-PSWindowsUpdateInstalled
+
+Write-Host "Iniciando instalacion forzada de actualizaciones..." -ForegroundColor Yellow
+Get-WindowsUpdate -KBArticleID $ListaKBs -Install -AcceptAll -AutoReboot
+
+Write-Host "Proceso finalizado" -ForegroundColor Green

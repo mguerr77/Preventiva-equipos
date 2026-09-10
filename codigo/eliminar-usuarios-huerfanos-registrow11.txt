@@ -1,0 +1,14 @@
+# Ejecutar como Administrador
+$ProfileList = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList"
+$Profiles = Get-ChildItem $ProfileList | Where-Object { $_.PSChildName -like "S-1-5-21-*" }
+Write-Host "Perfiles cargados" -ForegroundColor Yellow
+
+foreach ($P in $Profiles) {
+     Write-Host "Eliminando $P" -ForegroundColor Yellow
+    $Path = Get-ItemProperty $P.PSPath | Select-Object -ExpandProperty ProfileImagePath
+    Write-Host "path $Path" -ForegroundColor Yellow
+    #if (!(Test-Path $Path)) {
+        Write-Host "Eliminando registro huérfano: $Path" -ForegroundColor Yellow
+        Remove-Item $P.PSPath -Recurse -Force
+    #}
+}

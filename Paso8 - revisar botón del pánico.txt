@@ -1,0 +1,29 @@
+Botón del pánico
+
+necesidad un usuario puedasolicitar ayuda a los terminales de los usuarios más cercanos y 
+así estos puedan asistirlo en dichaemergencia. Algo a tener en cuenta muy importante es que 
+el equipo tenga la ubicación correctapara que pueda funcionar, sin la ubicación correcta no 
+sabrán a donde tienen que acudir
+
+activación  -->    combinación de teclas Ctrl+F12   -->   se propagará su estado al resto de equipos de su 
+										centro que se encuentrenconectados y aparecerá 
+										en el escritorio de éstos una ventana informando
+										 del equipo donde segeneró, su ubicación y el
+										 momento en el que se ha producido
+									+ aparece ventana emergente en el equipo lanzador: --AVISO-- 
+desactivar -->    combinación   de   teclas   May+F12 o Ctrl+May+F12
+
+
+En el fondo del escritorio Letsas, (puede pulsar la tecla windows para minimizar todas lasaplicaciones), 
+puede verse en todo momento el estado del botón de pánico del equipo local, quepuede ser OK o ALARMA
+
+**** Comprobara que no pone INACTIVO***  --> no está bien configurado
+
+
+comprobar o actualizar su ubicación debe realizarlo desde la aplicación  ayudaDIGITALescritorio, 
+esta aplicación está siempre en segundo plano en los terminales y puede abrirse de 2maneras diferentes
+
++ En la barra de tareas en la parte derecha podemo ver el icono de ayudaDIGITAL
++ Botón ayudaDIGITAL del menú inicial
+
+--> abajo a la izquierda --> Ubicación --> se ajusta y se guardan cambios
