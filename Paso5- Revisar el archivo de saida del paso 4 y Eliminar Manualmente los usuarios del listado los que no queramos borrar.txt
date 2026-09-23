@@ -2,3 +2,7 @@ Paso5- Revisar el archivo de saida del paso 4
 y Eliminar Manualmente los usuarios del listado los que no queramos borrar
 el siguente script tomará ese archico de partida para eliminr los perfiles
 del registro y de la carpeta users
+
+
+antunezmarinar07j
+Hospital2026.1

@@ -1,29 +1,27 @@
-﻿# =========================
-# DETECTAR USB O USAR RUTA LOCAL
-# =========================
-$usb = Get-Volume | Where-Object { $_.FileSystemLabel -eq 'KINGSTON' }
+﻿
 
-if ($usb) {
-    $rutaBase = "$($usb.DriveLetter):\preventiva"
-    Write-Host "Pendrive KINGSTON detectado. Se usara la ruta USB: $rutaBase" -ForegroundColor DarkGray
-} else {
-    $rutaBase = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\preventiva'))
-    Write-Host "No se ha encontrado el pendrive KINGSTON. Se usara la ruta local de trabajo: $rutaBase" -ForegroundColor Yellow
-}
+# ====================================================================================================
+# Script: ReporteActualizaciones(v2-altiris).ps1
+# Descripción: Genera un reporte de actualizaciones KB con errores o fallidas en el
+# sistema operativo Windows. Este script es una versión mejorada del original, 
+# con soporte para evitar repeticiones de KB en el reporte final.
+# ====================================================================================================
 
-# Crear carpeta si no existe
-if (!(Test-Path $rutaBase)) {
-    New-Item -ItemType Directory -Path $rutaBase -Force | Out-Null
-}
+# DETECTAR RUTA LOCAL
+# Crear carpeta si no existe para almacenar localmente el reporte
+
+if (!(Test-Path (Join-Path $env:SystemDrive '\preventiva'))) 
+{
+    New-Item -ItemType Directory -Path (Join-Path $env:SystemDrive '\preventiva') -Force | Out-Null
+}    
+
+$rutaBase = [System.IO.Path]::GetFullPath((Join-Path $env:SystemDrive '\preventiva'))
 
 # Nombre archivo = nombre PC
 $nombrePC = $env:COMPUTERNAME
-#$ruta = "$rutaBase\$nombrePC.txt"
 
 # Configuración del archivo de salida
-$OutputFile = "$rutaBase\Reporte_Sistema_y_Actualizaciones-v0.2-$nombrePC.txt"
-
-
+$OutputFile = "$rutaBase\Reporte_Sistema_y_Actualizaciones-v0.3-$nombrePC.txt"
 
 # 1. Obtener versión del Sistema Operativo
 $OS = Get-CimInstance -ClassName Win32_OperatingSystem
@@ -39,7 +37,6 @@ Arquitectura:      $($OS.OSArchitecture)
 "@
 
 # 2. Obtener historial completo de actualizaciones usando la API de Windows Update
-Write-Host "Buscando fallos y errores de parches KB..." -ForegroundColor Cyan
 
 $UpdateSession = New-Object -ComObject Microsoft.Update.Session
 $UpdateSearcher = $UpdateSession.CreateUpdateSearcher()
@@ -93,13 +90,15 @@ $FinalReport = New-Object System.Text.StringBuilder
 [void]$FinalReport.AppendLine($ReportHeader)
 
 $ErroresEncontrados = 0
+# Evitar repeticiones de KB en el reporte final usando un HashSet
+$KBReportados = New-Object System.Collections.Generic.HashSet[string]
 
 if ($UpdateHistory -is [array]) {
-    # Ordenar por fecha más reciente primero
     foreach ($Update in ($UpdateHistory | Sort-Object Fecha -Descending)) {
-        
-        # FILTRO: El estado debe ser un error/fallo Y el ID debe ser un KB real
-        if ($Update.Estado -ne "Instalado con éxito" -and $Update.KB -ne "No aplica") {
+        $kbActual = $Update.KB
+
+        # FILTRO: El estado debe ser un error/fallo, el ID debe ser un KB real y no repetido
+        if ($Update.Estado -ne "Instalado con éxito" -and $kbActual -ne "No aplica" -and $KBReportados.Add($kbActual)) {
             [void]$FinalReport.AppendLine("Fecha:   $($Update.Fecha)")
             [void]$FinalReport.AppendLine("Estado:  $($Update.Estado)")
             [void]$FinalReport.AppendLine("Error:   $($Update.CódigoError)")
@@ -119,10 +118,3 @@ if ($ErroresEncontrados -eq 0) {
 # 4. Guardar en el archivo de texto
 $FinalReport.ToString() | Out-File -FilePath $OutputFile -Encoding utf8
 
-# Mensaje en consola inteligente
-if ($ErroresEncontrados -gt 0) {
-    Write-Host "Se encontraron $ErroresEncontrados incidencias con parches KB." -ForegroundColor Yellow
-} else {
-    Write-Host "Sistema limpio. Cero errores KB detectados." -ForegroundColor Green
-}
-Write-Host "Reporte generado en: $OutputFile" -ForegroundColor Cyan

@@ -1,43 +1,53 @@
-﻿<#
-.SYNOPSIS
-    Auditoría pericial de perfiles inactivos.
-    Correlaciona metadatos WMI, heurística de ficheros y el registro de eventos 
-    de seguridad (EventID 4624) mediante consultas XPath de alto rendimiento.
-#>
+﻿###########################################################################################
+# .Descripción
+#    Auditoría pericial de perfiles inactivos.
+#    Correlaciona metadatos WMI, heurística de ficheros y el registro de eventos 
+#    de seguridad (EventID 4624) mediante consultas XPath de alto rendimiento.
+#>###########################################################################################
 
 # =========================
-# DETECTAR USB
+# RUTA DE TRABAJO: usar carpeta local del sistema (C:\preventiva)
 # =========================
-$usb = Get-Volume | Where-Object { $_.FileSystemLabel -eq 'KINGSTON' }
-
-if (!$usb) {
-    Write-Host 'ERROR: No se ha encontrado el pendrive.'
-    exit
-}
-
-$rutaBase = "$($usb.DriveLetter):\preventiva"
-
-# Crear carpeta si no existe
-if (!(Test-Path $rutaBase)) {
-    New-Item -ItemType Directory -Path $rutaBase | Out-Null
+$rootPreventiva = "$env:SystemDrive\preventiva"
+if (-not (Test-Path $rootPreventiva)) {
+    New-Item -ItemType Directory -Path $rootPreventiva -Force | Out-Null
 }
 
 # Nombre archivo = nombre PC
 $nombrePC = $env:COMPUTERNAME
-#$ruta = "$rutaBase\$nombrePC.txt"
+$OutputFile = "$rootPreventiva\Reporte_usuarios-plus-90-v0.2-$nombrePC.txt"
 
+# Protecciones de perfiles que no deben eliminarse
+$NombresExcluidos = @(
+    'Acceso público',
+    'Admin',
+    'Administrador',
+    'Default',
+    'Srvc_SC02Altiris',
+    'Public'
+    'Administrator',
+    'DefaultAppPool',
+    'defaultuser0',
+    'WDAGUtilityAccount',
+    'Default User',
+    'All Users'
+)
+$NombresExcluidosLower = $NombresExcluidos | ForEach-Object { $_.ToLowerInvariant() }
 
+# Borra el archivo previo si existe
+if (Test-Path $OutputFile) { Remove-Item $OutputFile -Force }
+
+# =========================
+# DETECTAR USB
+# =========================
+# Se elimina la dependencia de pendrive para este flujo.
 
 # Configuración del archivo de salida
 
 
-if (Test-Path "$rutaBase\Reporte_usuarios-plus-90-v0.2-$nombrePC.txt") { Remove-Item "$rutaBase\Reporte_usuarios-plus-90-v0.2-$nombrePC.txt" }
-
-$OutputFile = "$rutaBase\Reporte_usuarios-plus-90-v0.2-$nombrePC.txt"
-
 # parámetros de filtro de fecha
 
-$LimiteDias = 90
+$LimiteDias = 180
 $FechaCorte = (Get-Date).AddDays(-$LimiteDias)
 
 Write-Host "========================================================================" -ForegroundColor Cyan
@@ -53,6 +63,18 @@ $Resultado = foreach ($Perfil in $Perfiles) {
         $Usuario = (New-Object System.Security.Principal.SecurityIdentifier($Perfil.SID)).Translate([System.Security.Principal.NTAccount]).Value
     } catch {
         $Usuario = "Cuenta huérfana ($($Perfil.SID))"
+    }
+
+    # Excluir perfiles protegidos
+    if ($NombresExcluidosLower -contains $Usuario.ToLowerInvariant()) {
+        Write-Host "   [SKIP] Perfil protegido: $Usuario" -ForegroundColor Yellow
+        return
+    }
+
+    $NombreCarpeta = Split-Path -Path $Perfil.LocalPath -Leaf
+    if ($NombresExcluidosLower -contains $NombreCarpeta.ToLowerInvariant()) {
+        Write-Host "   [SKIP] Carpeta protegida: $NombreCarpeta" -ForegroundColor Yellow
+        return
     }
 
     Write-Host "-> Analizando perfil de dominio: $Usuario" -ForegroundColor Yellow
@@ -113,7 +135,7 @@ $Resultado = foreach ($Perfil in $Perfiles) {
     $FechaReal = $null
     $MetodoUtilizado = ""
 
-    # Jerarquía de confianza: EventLog > Heurística > WMI
+    # Jerarquía de confianza: EventLog > Heuristica > WMI
     if ($null -ne $FechaEventLog) {
         $FechaReal = $FechaEventLog
         $MetodoUtilizado = "Visor de Eventos (Alta Fiabilidad)"
@@ -155,6 +177,10 @@ if ($PerfilesInactivos) {
     # Análisis sintáctico y generación del archivo de parámetros
     foreach ($Perfil in $PerfilesInactivos) {
         $NombreCarpeta = Split-Path -Path $Perfil.RutaPerfil -Leaf
+        if ($NombresExcluidosLower -contains $NombreCarpeta.ToLowerInvariant()) {
+            Write-Host "   [SKIP] Excluido de la exportación: $NombreCarpeta" -ForegroundColor Yellow
+            continue
+        }
         Add-Content $OutputFile -Value $NombreCarpeta
     }
     
