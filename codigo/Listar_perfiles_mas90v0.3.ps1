@@ -15,7 +15,7 @@ if (-not (Test-Path $rootPreventiva)) {
 
 # Nombre archivo = nombre PC
 $nombrePC = $env:COMPUTERNAME
-$OutputFile = "$rootPreventiva\Reporte_usuarios-plus-90-v0.2-$nombrePC.txt"
+$OutputFile = "$rootPreventiva\Reporte_usuarios-plus-180-v0.3-$nombrePC.txt"
 
 # Protecciones de perfiles que no deben eliminarse
 $NombresExcluidos = @(
@@ -24,7 +24,7 @@ $NombresExcluidos = @(
     'Administrador',
     'Default',
     'Srvc_SC02Altiris',
-    'Public'
+    'Public',
     'Administrator',
     'DefaultAppPool',
     'defaultuser0',

@@ -59,6 +59,7 @@ foreach ($Perfil in $PerfilesUsuarios) {
             (Join-Path $Perfil.FullName "AppData\Local\Microsoft\Edge\User Data\Default\Cache"),
             (Join-Path $Perfil.FullName "AppData\Local\Microsoft\Edge\User Data\Default\Code Cache"),
             (Join-Path $Perfil.FullName "AppData\Local\Microsoft\Edge\User Data\component_crx_cache")
+            (Join-Path $Perfil.FullName "AppData\Local\Mozilla\Firefox\Profiles")
         )
         
         foreach ($SubRuta in $RutasPerfil) {
