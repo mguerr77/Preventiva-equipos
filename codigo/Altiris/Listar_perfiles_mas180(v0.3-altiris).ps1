@@ -1,8 +1,8 @@
 ﻿###########################################################################################
 # .Descripción
-#    Auditoría pericial de perfiles inactivos.
+#    Auditoría de perfiles inactivos.
 #    Correlaciona metadatos WMI, heurística de ficheros y el registro de eventos 
-#    de seguridad (EventID 4624) mediante consultas XPath de alto rendimiento.
+#    de seguridad (EventID 4624) mediante consultas XPath
 #>###########################################################################################
 
 # =========================

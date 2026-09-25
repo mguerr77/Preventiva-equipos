@@ -107,4 +107,3 @@ Write-Host "`n--- Ejecutando consolidación del almacén de componentes (DISM) -
 DISM.exe /Online /Cleanup-Image /StartComponentCleanup /ResetBase
 
 Write-Host "`nPROCESO FINALIZADO CORRECTAMENTE" -ForegroundColor Green
-Write-Host "`nPROCESO FINALIZADO CORRECTAMENTE" -ForegroundColor Green
