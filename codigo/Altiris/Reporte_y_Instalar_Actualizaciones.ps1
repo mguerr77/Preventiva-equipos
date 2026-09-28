@@ -1,6 +1,8 @@
 ﻿########################################################################################################
 # DESCRIPCIÓN
-# Script autocontenido de generación de reporte KB e instalación de actualizaciones.    
+# Script que genera reporte de KBXXXXXX(actualizaciones) fallidas halladas en el registro de windows.
+# A partir de este informe se realiza la instalación forzada de actualizaciones mediante la herramienta 
+# PSWindowsUpdate.
 # Diseñado para ejecutarse desde una herramienta de gestión centralizada en equipos remotos.
 #     1) Genera el reporte de actualizaciones si no existe.
 #     2) Comprueba e instala PSWindowsUpdate si hace falta.
