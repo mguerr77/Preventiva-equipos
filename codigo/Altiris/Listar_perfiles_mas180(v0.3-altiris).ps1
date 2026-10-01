@@ -8,14 +8,28 @@
 # =========================
 # RUTA DE TRABAJO: usar carpeta local del sistema (C:\preventiva)
 # =========================
+Write-Host "[TRAZA] Inicializando rutas de trabajo..." -ForegroundColor DarkGray
 $rootPreventiva = "$env:SystemDrive\preventiva"
+Write-Host "[TRAZA] Ruta base: $rootPreventiva" -ForegroundColor DarkGray
+
 if (-not (Test-Path $rootPreventiva)) {
-    New-Item -ItemType Directory -Path $rootPreventiva -Force | Out-Null
+    Write-Host "[TRAZA] Carpeta no existe, creando: $rootPreventiva" -ForegroundColor DarkGray
+    try {
+        New-Item -ItemType Directory -Path $rootPreventiva -Force -ErrorAction Stop | Out-Null
+        Write-Host "[✓] Carpeta creada exitosamente" -ForegroundColor Green
+    } catch {
+        Write-Host "[✗] ERROR: No se pudo crear la carpeta: $_" -ForegroundColor Red
+        exit 1
+    }
+} else {
+    Write-Host "[✓] Carpeta ya existe" -ForegroundColor Green
 }
 
 # Nombre archivo = nombre PC
 $nombrePC = $env:COMPUTERNAME
+Write-Host "[TRAZA] Nombre del equipo: $nombrePC" -ForegroundColor DarkGray
 $OutputFile = "$rootPreventiva\Reporte_usuarios-plus-180-v0.3-$nombrePC.txt"
+Write-Host "[TRAZA] Ruta del archivo de salida: $OutputFile" -ForegroundColor DarkGray
 
 # Protecciones de perfiles que no deben eliminarse
 $NombresExcluidos = @(
@@ -35,15 +49,19 @@ $NombresExcluidos = @(
 $NombresExcluidosLower = $NombresExcluidos | ForEach-Object { $_.ToLowerInvariant() }
 
 # Borra el archivo previo si existe
-if (Test-Path $OutputFile) { Remove-Item $OutputFile -Force }
-
-# =========================
-# DETECTAR USB
-# =========================
-# Se elimina la dependencia de pendrive para este flujo.
+if (Test-Path $OutputFile) {
+    Write-Host "[TRAZA] Archivo anterior existe, eliminando: $OutputFile" -ForegroundColor DarkGray
+    try {
+        Remove-Item $OutputFile -Force -ErrorAction Stop
+        Write-Host "[✓] Archivo anterior eliminado" -ForegroundColor Green
+    } catch {
+        Write-Host "[✗] ERROR al eliminar archivo anterior: $_" -ForegroundColor Red
+    }
+} else {
+    Write-Host "[TRAZA] No existe archivo anterior (es la primera ejecución)" -ForegroundColor DarkGray
+}
 
 # Configuración del archivo de salida
-
 
 # parámetros de filtro de fecha
 
@@ -68,13 +86,13 @@ $Resultado = foreach ($Perfil in $Perfiles) {
     # Excluir perfiles protegidos
     if ($NombresExcluidosLower -contains $Usuario.ToLowerInvariant()) {
         Write-Host "   [SKIP] Perfil protegido: $Usuario" -ForegroundColor Yellow
-        return
+    #    return
     }
 
     $NombreCarpeta = Split-Path -Path $Perfil.LocalPath -Leaf
     if ($NombresExcluidosLower -contains $NombreCarpeta.ToLowerInvariant()) {
         Write-Host "   [SKIP] Carpeta protegida: $NombreCarpeta" -ForegroundColor Yellow
-        return
+    #    return
     }
 
     Write-Host "-> Analizando perfil de dominio: $Usuario" -ForegroundColor Yellow
@@ -101,7 +119,7 @@ $Resultado = foreach ($Perfil in $Perfiles) {
     }
 
     # -------------------------------------------------------------------------
-    # CAPA 3: Registro de Eventos de Seguridad (La fuente criptográfica más pura)
+    # CAPA 3: Registro de Eventos de Seguridad 
     # -------------------------------------------------------------------------
     $FechaEventLog = $null
     
@@ -174,17 +192,91 @@ Write-Host "====================================================================
 if ($PerfilesInactivos) {
     Write-Host "Perfiles que superan el umbral estricto de inactividad ($LimiteDias días):`n" -ForegroundColor Yellow
     $PerfilesInactivos | Format-Table Usuario, RutaPerfil, UltimoAccesoReal, DiasInactivo, FuenteDatos -AutoSize
-    # Análisis sintáctico y generación del archivo de parámetros
-    foreach ($Perfil in $PerfilesInactivos) {
-        $NombreCarpeta = Split-Path -Path $Perfil.RutaPerfil -Leaf
-        if ($NombresExcluidosLower -contains $NombreCarpeta.ToLowerInvariant()) {
-            Write-Host "   [SKIP] Excluido de la exportación: $NombreCarpeta" -ForegroundColor Yellow
-            continue
-        }
-        Add-Content $OutputFile -Value $NombreCarpeta
+    
+    # Escritura de cabecera informativa en el archivo de salida
+    Write-Host "[TRAZA] Preparando cabecera del reporte..." -ForegroundColor DarkGray
+    $cabecera = @"
+========================================================================
+REPORTE DE AUDITORÍA DE PERFILES INACTIVOS
+========================================================================
+Fecha de generación: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+Equipo: $nombrePC
+Umbral de inactividad: $LimiteDias días
+Fecha de corte: $($FechaCorte.ToString('yyyy-MM-dd HH:mm:ss'))
+Cantidad de perfiles detectados: $($PerfilesInactivos.Count)
+========================================================================
+LISTADO DE CARPETAS CANDIDATAS PARA ELIMINACIÓN:
+========================================================================
+"@
+    
+    Write-Host "[TRAZA] Escribiendo cabecera en archivo: $OutputFile" -ForegroundColor DarkGray
+    try {
+        Add-Content -Path $OutputFile -Value $cabecera -ErrorAction Stop
+        Write-Host "[✓] Cabecera escribida exitosamente (líneas: $($cabecera.Split([Environment]::NewLine).Count))" -ForegroundColor Green
+    } catch {
+        Write-Host "[✗] ERROR al escribir cabecera: $_" -ForegroundColor Red
+        Write-Host "[✗] Stack: $($_.Exception.StackTrace)" -ForegroundColor Red
     }
     
-    Write-Host "[✓] Matriz de directorios exportada exitosamente en: $OutputFile" -ForegroundColor Green
+    # Análisis sintáctico y generación del archivo de parámetros
+    # Se escribe SOLO el nombre de la carpeta en cada línea (compatible con eliminar-perfiles-registro-y-directorio.ps1)
+    Write-Host "[TRAZA] Iniciando iteración de perfiles ($($PerfilesInactivos.Count) total)..." -ForegroundColor DarkGray
+    $contadorEscrito = 0
+    $contadorSaltado = 0
+    
+    foreach ($Perfil in $PerfilesInactivos) {
+        $NombreCarpeta = Split-Path -Path $Perfil.RutaPerfil -Leaf
+        Write-Host "[TRAZA] Procesando: $NombreCarpeta (Inactivo: $($Perfil.DiasInactivo) días)" -ForegroundColor DarkGray
+        
+        if ($NombresExcluidosLower -contains $NombreCarpeta.ToLowerInvariant()) {
+            Write-Host "   [SKIP] Excluido de la exportación: $NombreCarpeta" -ForegroundColor Yellow
+            $contadorSaltado++
+            continue
+        }
+        
+        try {
+            # Escribir información detallada como comentario, luego el nombre de carpeta limpio
+            #$linea = "# $NombreCarpeta | Inactivo $($Perfil.DiasInactivo) días | Último acceso: $($Perfil.UltimoAccesoReal.ToString('yyyy-MM-dd')) | Fuente: $($Perfil.FuenteDatos)"
+            #Add-Content -Path $OutputFile -Value $linea -ErrorAction Stop
+            #Write-Host "   [✓] Línea comentada escrita" -ForegroundColor DarkGray
+            
+            Add-Content -Path $OutputFile -Value $NombreCarpeta -ErrorAction Stop
+            Write-Host "   [✓] Nombre de carpeta escrito" -ForegroundColor DarkGray
+            $contadorEscrito++
+        } catch {
+            Write-Host "   [✗] ERROR al escribir $NombreCarpeta : $_" -ForegroundColor Red
+        }
+    }
+    
+    Write-Host "[TRAZA] Cierre del archivo..." -ForegroundColor DarkGray
+    try {
+        "" | Add-Content -Path $OutputFile -ErrorAction Stop
+        Write-Host "   [✓] Línea vacía escrita" -ForegroundColor DarkGray
+        
+        "========================================================================" | Add-Content -Path $OutputFile -ErrorAction Stop
+        Write-Host "   [✓] Línea de cierre escrita" -ForegroundColor DarkGray
+    } catch {
+        Write-Host "   [✗] ERROR al escribir cierre: $_" -ForegroundColor Red
+    }
+    
+    Write-Host "`n[✓] RESUMEN DE EXPORTACIÓN:" -ForegroundColor Green
+    Write-Host "    - Perfiles procesados: $contadorEscrito" -ForegroundColor Green
+    Write-Host "    - Perfiles excluidos: $contadorSaltado" -ForegroundColor Green
+    Write-Host "    - Ruta del archivo: $OutputFile" -ForegroundColor Green
+    
+    # Verificar que el archivo existe después de la creación
+    if (Test-Path $OutputFile) {
+        $fileSize = (Get-Item $OutputFile).Length
+        $fileLines = @(Get-Content $OutputFile).Count
+        Write-Host "    - Tamaño del archivo: $fileSize bytes" -ForegroundColor Green
+        Write-Host "    - Líneas en el archivo: $fileLines" -ForegroundColor Green
+    } else {
+        Write-Host "    [✗] ADVERTENCIA: El archivo de salida NO EXISTE después de la creación" -ForegroundColor Red
+        # Código de salida 1 para que Altiris lo considere incorrecto
+        exit 1
+    }
 } else {
     Write-Host "Evaluación pericial concluida: No existen perfiles con inactividad superior a $LimiteDias días bajo los criterios analizados." -ForegroundColor Green
+    # Código de salida 0 para que Altiris lo considere correcto
+    exit 0
 }

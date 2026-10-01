@@ -42,7 +42,13 @@ $NombresExcluidos = @(
     'Administrador',
     'Default',
     'Srvc_SC02Altiris',
-    'Public'
+    'Public',
+    'Administrator',
+    'DefaultAppPool',
+    'defaultuser0',
+    'WDAGUtilityAccount',
+    'Default User',
+    'All Users'
 )
 $NombresExcluidosLower = $NombresExcluidos | ForEach-Object { $_.ToLower() }
 
@@ -109,3 +115,5 @@ foreach ($NombreCarpeta in $CarpetasCandidatas) {
 # ========================================================================
 # Remove-Item -Path $RutaArchivoEntrada -Force -ErrorAction SilentlyContinue
 Write-Host "[✓] Operación de mantenimiento concluida. Artefacto de entrada neutralizado." -ForegroundColor Green
+# Código de salida 0 para que Altiris lo considere correcto
+exit 0

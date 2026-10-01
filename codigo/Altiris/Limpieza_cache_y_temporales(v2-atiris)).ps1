@@ -107,3 +107,5 @@ Write-Host "`n--- Ejecutando consolidación del almacén de componentes (DISM) -
 DISM.exe /Online /Cleanup-Image /StartComponentCleanup /ResetBase
 
 Write-Host "`nPROCESO FINALIZADO CORRECTAMENTE" -ForegroundColor Green
+# Código de salida 0 para que Altiris lo considere correcto
+exit 0
